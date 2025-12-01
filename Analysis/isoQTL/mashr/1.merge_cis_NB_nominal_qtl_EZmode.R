@@ -1,5 +1,5 @@
-# Merge cis nominal QTL results from TensorQTL
-
+# Merge cis nominal QTL results from jaxQTL
+# Modified from Natri et al paper
 # Bolun Li
 # Jul 8th 2024
 
@@ -22,15 +22,15 @@ celltypes_path <- "/data/Choi_lung/scLongreads/tensorqtl/isoform_level/Celltypes
 celltypes <- read.table(file = celltypes_path, sep = "\t")
 celltypes <- celltypes$V1
 
-tensor_path <- "/data/Choi_lung/scLongreads/mashr/"
-dir.create(file.path(tensor_path,"output"), showWarnings = FALSE)
+jax_path <- "/data/Choi_lung/scLongreads/mashr/"
+dir.create(file.path(jax_path,"output"), showWarnings = FALSE)
 
 for (celltype in celltypes) {
   celltype_for_path <- gsub(" ", "_", celltype)
   qtl_rst_all <- NB.nominal.list[[celltype_for_path]]
   qtl_rst_all$celltype <- celltype_for_path
-  dir.create(file.path(tensor_path,"output",celltype_for_path), showWarnings = FALSE)
-  output_path <- file.path(tensor_path,"output",celltype_for_path)
+  dir.create(file.path(jax_path,"output",celltype_for_path), showWarnings = FALSE)
+  output_path <- file.path(jax_path,"output",celltype_for_path)
   write.table(qtl_rst_all, file = paste0(output_path,"/qtl_results_all.txt"), sep = "\t",
               quote = FALSE, row.names = FALSE)
 }
@@ -41,7 +41,7 @@ library(vroom)
 library(collapse)
 library(rhdf5)
 
-dirs <- list.dirs(file.path(tensor_path,"output"), full.names = TRUE, recursive =FALSE)
+dirs <- list.dirs(file.path(jax_path,"output"), full.names = TRUE, recursive =FALSE)
 dirs <- paste0(dirs, "/qtl_results_all.txt")
 dirs <- dirs[file.exists(dirs)]
 
@@ -59,73 +59,30 @@ all_qtl <- all_qtl %>%
   fmutate(celltype = basename(dirname(celltype)),
           id = paste(feature_id, variant_id, sep="|"))
 table(all_qtl$celltype)
-# feats_keep <- scan(shared_isos, what="character")
-# all_qtl <- all_qtl %>% fsubset(feature_id %in% shared_isos)
-# 
-# n_thresh <- ceiling(args$min_states * nCelltypes)
-# n_state_with_results <- table(all_qtl$id) 
-# keep <- all_qtl$pval_nonimal < 0.2
-# message("Dropping ", sum(keep==FALSE), " associations with results for < ", 
-#         args$min_state*100, "% (n=", n_thresh, ") of states...")
-# all_qtl <- all_qtl[keep,]
-saveRDS(all_qtl, file = "/data/Choi_lung/scLongreads/mashr/all.qtl.rds")
-all_qtl <-  readRDS(file = "/data/Choi_lung/scLongreads/mashr/all.qtl.rds")
+
 table(all_qtl$celltype)
+
+# calculate z score for EZ mode
 all_qtl$zscore <- all_qtl$betas/all_qtl$error
 features <- unique(all_qtl$feature_id)
 ceiling(length(features)/20)
 feature_chunks <- split(features, rep(1:20,ceiling(length(features)/20))[-42940])
 beta.list <- list()
-# error.list <- list()
 for (i in 1:20) {
-  # betas1 <- subset(all_qtl, feature_id %in% feature_chunks[[i]]) %>% pivot_wider(names_from = celltype, values_from = betas,
-  #                                                                                id_cols = id) %>%
-  #   tibble::column_to_rownames(var = "id") %>% qDF()
+
   betas1 <- subset(all_qtl, feature_id %in% feature_chunks[[i]]) %>% pivot_wider(names_from = celltype, values_from = zscore,
                                                                                  id_cols = id) %>%
     tibble::column_to_rownames(var = "id") %>% qDF()
-  # betas1[is.na(betas1)] <- 0
+
   message(ncol(betas1), " cell types included")
   tmp <- is.na(betas1)
   tmp <- rowSums(tmp)
+  # remove pairs with NA in all cell types
   del_idx <- which(tmp == 33)
   if(length(del_idx) == 0){
-    # error1 <- subset(all_qtl, feature_id %in% feature_chunks[[i]]) %>% pivot_wider(names_from = celltype, values_from = error,
-    #                                                                                id_cols = id) %>%
-    #   tibble::column_to_rownames(var = "id") %>% qDF()
-    # k <- which(is.na(error1), arr.ind=TRUE)
-    # message("Max of errors: ", max(error1))
-    # message("Mean of errors: ", mean(error1))
-    # # error1[k] <- rowMeans(error1, na.rm=TRUE)[k[, 1]] 
-    betas1[is.na(betas1)] <- 0
-    # error1[k] <- 100
-    # message(length(which(is.na(error1))), " NAs")
-    # k1 <- which(error1 > 100, arr.ind=TRUE)
-    # betas1[k1] <- 0
-    # error1[k1] <- 100
-    # message(length(which(is.na(error1))), " NAs")
-    # message("Max of SE: ", max(error1))
-    # error.list[[i]] <- error1
-    
     beta.list[[i]] <- betas1
   }else{
     betas1 <- betas1[-del_idx,]
-    # error1 <- subset(all_qtl, feature_id %in% feature_chunks[[i]]) %>% pivot_wider(names_from = celltype, values_from = error,
-    #                                                                                id_cols = id) %>%
-    #   tibble::column_to_rownames(var = "id") %>% qDF()
-    # error1 <- error1[-del_idx,]
-    # k <- which(is.na(error1), arr.ind=TRUE)
-    # # error1[k] <- rowMeans(error1, na.rm=TRUE)[k[, 1]] 
-    betas1[is.na(betas1)] <- 0
-    # error1[k] <- 100
-    # message(length(which(is.na(error1))), " NAs")
-    # k1 <- which(error1 > 100, arr.ind=TRUE)
-    # betas1[k1] <- 0
-    # error1[k1] <- 100
-    # message(length(which(is.na(error1))), " NAs")
-    # message("Max of SE: ", max(error1))
-    # error.list[[i]] <- error1
-    # 
     beta.list[[i]] <- betas1
   }
   

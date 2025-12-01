@@ -1,5 +1,5 @@
 # Get the strong and random QTL signals using significant eQTL as strong
-
+# Using Z score
 # Bolun Li
 # Jul 9th 2024
 
