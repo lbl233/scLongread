@@ -125,3 +125,52 @@ ggplot(df_final,
             position = position_dodge(0.9), size=3)+
   theme(axis.text = element_text(size = 14, colour = "black"))+
   theme_classic()
+
+# Cell type similarity (pair-wise comparison)
+# percentage of sharing within mashr significant pairs of each cell type
+S = matrix(NA, nrow = length(ct), ncol = length(ct))
+for (i in 1:length(ct)) {
+  celltype <- ct[i]
+  zero_mtx <- beta_final!=0
+  true_sig <- zero_mtx+sig_mtx
+  true_sig <- true_sig==2
+  for (j in i:length(ct)){
+    beta_i <- beta_final[,i]
+    beta_j <- beta_final[,j]
+    beta_factor <- beta_j/beta_i
+    beta_shared <- (beta_factor > 0.5 & beta_factor < 2)
+    S[i,j] <- sum(beta_shared[true_sig[,i]], na.rm = TRUE)/sum(true_sig[,i])
+    S[j,i] <- sum(beta_shared[true_sig[,j]], na.rm = TRUE)/sum(true_sig[,j])
+  }
+}
+colnames(S) <- ct
+rownames(S) <- ct
+S <- S[,names(isoQTL_sig_list)]
+S <- S[names(isoQTL_sig_list),]
+library(pheatmap)
+pheatmap(S, border_color = "white")
+pheatmap(S, cluster_rows = FALSE)
+pheatmap(S, cluster_cols = FALSE)
+pheatmap(S, cluster_cols = FALSE, cluster_rows = FALSE)
+
+# percentage of sharing within the union of mashr significant pairs of two cell types
+S2 = matrix(NA, nrow = length(ct), ncol = length(ct))
+for (i in 1:length(ct)) {
+  celltype <- ct[i]
+  zero_mtx <- beta_final!=0
+  true_sig <- zero_mtx+sig_mtx
+  true_sig <- true_sig==2
+  for (j in i:length(ct)){
+    beta_i <- beta_final[,i]
+    beta_j <- beta_final[,j]
+    beta_factor <- beta_j/beta_i
+    beta_shared <- (beta_factor > 0.5 & beta_factor < 2)
+    divisor <- (true_sig[,i]+true_sig[,j])>0
+    S2[i,j] <- sum(beta_shared[divisor], na.rm = TRUE)/sum(divisor)
+    S2[j,i] <- sum(beta_shared[divisor], na.rm = TRUE)/sum(divisor)
+  }
+}
+colnames(S2) <- ct
+rownames(S2) <- ct
+S2 <- S2[names(isoQTL_sig_list),names(isoQTL_sig_list)]
+pheatmap(S2, border_color = "white")
