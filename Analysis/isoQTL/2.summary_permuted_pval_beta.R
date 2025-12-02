@@ -1,29 +1,7 @@
-# Permutation of DEI
+# Type I error control
+# summarize pval beta on permuted data
 
-# 
-
-
-library(stringr)
-library(stringi)
-library(dplyr)
-library(ggplot2)
-library(Seurat)
-
-files <- list.files("/data/Choi_lung/scLongreads/DEI/WholegroupPhaseI/output_permutation/UnfilteredResults/", pattern = ".csv")
-
-
-celltypes <- str_split_fixed(files, "_", 5)[,5]
-celltypes <- str_split_fixed(celltypes, "\\.", 2)[,1]
-celltypes <- gsub(" ", "_", celltypes)
-
-DEI_per.list <- list()
-Sig_DEI <- NULL
-for (i in 1:37) {
-  DEI_rst <- read.csv(paste0("/data/Choi_lung/scLongreads/DEI/WholegroupPhaseI/output_permutation/UnfilteredResults/",files[i]))
-  DEI_per.list[[celltypes[i]]] <- DEI_rst
-  Sig_DEI <- c(length(which(DEI_rst$padj < 0.05 & abs(DEI_rst$log2FoldChange) > 1)), Sig_DEI)
-}
-names(DEI_per.list) <- celltypes
+# Bolun
 
 library("plotrix")
 library("data.table")
@@ -86,31 +64,34 @@ qqplotdata <- function(logpvector){
   return(qqdata)
 }
 
-
-output_path <- "/data/Choi_lung/scLongreads/DEI/WholegroupPhaseI/output_permutation/plot/"
+input_path <- "/data/Choi_lung/scLongreads/tensorqtl/isoform_level/output"
+output_path <- "/data/lib14/project/scLongread/"
 
 for (celltype in celltypes) {
-  
-  message("Celltype: ", celltype)
-  
-  all_DEI <- DEI.list[[celltype]]
-  perm_DEI <- DEI_per.list[[celltype]]
-  
-  pvals <- all_DEI$padj
-  pvals_permutated <- perm_DEI$pvalue
-  idx <- union(which(is.na(pvals)), which(is.na(pvals_permutated)))
-  print(length(idx))
-  pvals <- pvals[!is.na(pvals)]
+  celltype_for_path <- gsub(" ", "_", celltype)
+  message("Celltype: ", celltype_for_path)
+  qtl_path <- file.path(input_path,celltype_for_path)
+  all_qtl <- read.table(file = paste0(qtl_path,"/qtl_results_all.txt"), 
+                        sep = "\t", header = TRUE)
+  rownames(all_qtl) <- paste(all_qtl$phenotype_id, all_qtl$variant_id, sep = "-")
+  permutated_qtl <- read.table(file = paste0(qtl_path,"/permutation_qtl_results_all.txt"), 
+                        sep = "\t", header = TRUE)
+  rownames(permutated_qtl) <- paste(permutated_qtl$phenotype_id, permutated_qtl$variant_id, sep = "-")
+  rowname <- intersect(rownames(all_qtl), rownames(permutated_qtl))
+  permutated_qtl <- permutated_qtl[rowname,]
+  set.seed(12345)
+  idx <- sample(1:length(all_qtl$pval_nominal), 10000000)
+  pvals <- all_qtl$pval_nominal[idx]
+  pvals_permutated <- permutated_qtl$pval_nominal[idx]
   legendcol <- character(0)
   ycol <- "log10P"
   plotdata <- qqplotdata_permutation(-log10(pvals), -log10(pvals_permutated))
-  plotdata <- plotdata[!(plotdata$o==Inf),]
   fx <- plotdata$e
   fy <- plotdata$o
   fcol <- rep("#E41A1C",length(plotdata$o))
-  opt =  list(break.top = ceiling(max(fx)),
+  opt =  list(break.top = 10,
               top.size = 0.125)
-  png(filename = paste0(output_path,"QQplot_permutation_vs_oberved_", celltype, ".png"), width = 8, height = 8, units = "in",res=300)
+  png(filename = paste0(output_path,"QQplot_permutation_vs_oberved_", celltype_for_path, ".png"), width = 8, height = 8, units = "in",res=300)
   xlim <- c(0,max(fx,na.rm=T))
   ylim <- c(0,max(fy,na.rm=T))
   maxY <- max(fy,na.rm=T)
@@ -158,13 +139,12 @@ for (celltype in celltypes) {
   dev.off()
   # null vs observed p
   plotdata <- qqplotdata(-log10(pvals))
-  plotdata <- plotdata[!(plotdata$o==Inf),]
   fx <- plotdata$e
   fy <- plotdata$o
   fcol <- rep("#E41A1C",length(plotdata$o))
-  opt =  list(break.top =  ceiling(max(fx)),
+  opt =  list(break.top = 10,
               top.size = 0.125)
-  png(filename = paste0(output_path,"QQplot_null_vs_oberved_", celltype, ".png"), width = 8, height = 8, units = "in",res=300)
+  png(filename = paste0(output_path,"QQplot_null_vs_oberved_", celltype_for_path, ".png"), width = 8, height = 8, units = "in",res=300)
   xlim <- c(0,max(fx,na.rm=T))
   ylim <- c(0,max(fy,na.rm=T))
   maxY <- max(fy,na.rm=T)
@@ -213,13 +193,12 @@ for (celltype in celltypes) {
   
   # null vs permutation
   plotdata <- qqplotdata(-log10(pvals_permutated))
-  plotdata <- plotdata[!(plotdata$o==Inf),]
   fx <- plotdata$e
   fy <- plotdata$o
   fcol <- rep("#E41A1C",length(plotdata$o))
-  opt =  list(break.top = ceiling(max(fx,na.rm=T)),
+  opt =  list(break.top = 10,
               top.size = 0.125)
-  png(filename = paste0(output_path,"QQplot_null_vs_permutation_", celltype, ".png"), width = 8, height = 8, units = "in",res=300)
+  png(filename = paste0(output_path,"QQplot_null_vs_permutation_", celltype_for_path, ".png"), width = 8, height = 8, units = "in",res=300)
   xlim <- c(0,max(fx,na.rm=T))
   ylim <- c(0,max(fy,na.rm=T))
   maxY <- max(fy,na.rm=T)
@@ -266,47 +245,4 @@ for (celltype in celltypes) {
   title(paste0("The expected p-values under the null hypothesis (x-axis) \n against the permutated p-values (y-axis) in ",celltype))
   dev.off()
 }
-
-# FDR
-df.list <- list()
-for (celltype in celltypes) {
-  rst <- DEI_per.list[[celltype]]
-  df <- data.frame(x = as.numeric(c(0, 0.00001, 0.0001, 0.001, 0.01, 0.05, 0.1, 0.2)),
-                   sig_pct = c(0, sum((rst$padj < 0.00001), na.rm = TRUE),
-                               sum((rst$padj < 0.0001), na.rm = TRUE),
-                               sum((rst$padj < 0.001), na.rm = TRUE),
-                               sum((rst$padj < 0.01), na.rm = TRUE),
-                               sum((rst$padj < 0.05), na.rm = TRUE),
-                               sum((rst$padj < 0.1), na.rm = TRUE),
-                               sum((rst$padj < 0.2), na.rm = TRUE)))
-  #df$x <- factor(df$x, levels = as.numeric(c(0, 0.00001, 0.0001, 0.001, 0.01, 0.05, 0.1, 0.2)))
-  df$sig_pct <- (df$sig_pct/nrow(rst))
-  df$Celltype <- celltype
-  df.list[[celltype]] <- df
-}
-df <- do.call(rbind, df.list)
-
-df %>% group_by(x) %>% summarise(num_off = sum(sig_pct >= 0.05))
-
-df$Celltype <- factor(df$Celltype, levels = gsub(" ", "_", levels(lr$Celltype)))
-ggplot(df, aes(x = x, y = sig_pct, fill = Celltype)) + 
-  geom_bar(stat="identity",position = "identity") +
-  scale_fill_manual(values = cellcolors) + 
-  geom_hline(yintercept = 5) + 
-  scale_x_discrete(labels = paste0(round(c(0, 0.00001, 0.0001, 0.001, 0.01, 0.05, 0.1, 0.2)*100, digits=3), "%")) +
-  xlab("FDR cutoff") + ylab("Percentage of significant isoform (%)") +
-  facet_wrap(~Celltype, ncol = 8)+
-  theme(axis.text.x = element_text(color = "black", size = 10, angle = 0, face = "plain"),
-        strip.text = element_text(color = "black", size = 12),
-        axis.text.y = element_text(color = "black", size = 12, angle = 0, face = "plain"),
-        axis.title.x = element_text(color = "black", size = 20, angle = 0, hjust = .5, vjust = 0, face = "plain"),
-        axis.title.y = element_text(color = "black", size = 20, angle = 90, hjust = .5, vjust = .5, face = "plain"),
-        panel.background = element_rect(fill='transparent'),
-        plot.background = element_rect(fill='transparent'),
-        axis.line = element_line(linewidth = .5, colour = "black", linetype=1),
-        legend.title = element_text(size=10),
-        legend.text = element_text(size=10),
-        legend.position="none",
-        legend.justification="right")
-ggsave("/data/lib14/project/scLongread/FigSMethod.pdf", width = 20,height = 15)
 

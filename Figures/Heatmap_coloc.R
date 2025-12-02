@@ -81,21 +81,3 @@ library(cowplot)
 pdf("/data/lib14/project/scLongread/Fig7A.pdf", width = 7.75 , height = 12)
 print(grid.arrange(arrangeGrob(legend, bp.x.clean, ncol = 2,widths = c(10,20)), hm.clean,  nrow = 2, ncol = 1, heights = c(10, 80)))
 dev.off()
-
-
-transcripts_genes <- c("HLA-DRB5","SECISBP2L",
-                 "HLA-DRB1","CHMP3","RSPH4A",
-                 "PPIL6","HLA-A","PSMA4","HSPA1B")
-
-write.table(output.ratio, file = "/data/Choi_lung/scLongreads/colocalization/lung_function/Colocalization_output_table.txt", sep = "\t",
-            row.names = FALSE, quote = FALSE)
-write.table(output.fev1, file = "/data/Choi_lung/scLongreads/colocalization/lung_function/Colocalization_output_table_fev1.txt", sep = "\t",
-            row.names = FALSE, quote = FALSE)
-
-
-shrine_coloc <- read.table("/data/Choi_lung/scLongreads/colocalization/lung_function/Shrine_coloc.txt", header = TRUE, sep = "\t")
-unique(shrine_coloc$gene[grepl("Lung", shrine_coloc$tissue)])
-unique(output.ratio$gene_name)
-length(setdiff(unique(output.ratio$gene_name), unique(shrine_coloc$gene[grepl("Lung", shrine_coloc$tissue)])))
-intersect(unique(output.ratio$gene_name), unique(shrine_coloc$gene))
-intersect(unique(output.final.sig$gene_name), unique(shrine_coloc$gene))

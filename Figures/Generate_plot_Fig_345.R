@@ -148,7 +148,7 @@ ggplot(df_final,
   geom_bar(stat="identity", position=position_dodge()) + xlab("Number of shared cell type")+ylab("Number of lead isoQTL-eIsoform pairs") +
   geom_text(aes(label = Freq), , vjust=-.1, color="black",
             position = position_dodge(0.9), size=3)+
-  scale_y_break(c(1000,1500))+
+  scale_y_break(c(400,900))+
   theme(axis.text.x = element_text(color = "black", size = 12, angle = 0, face = "plain"),
         axis.text.y = element_text(color = "black", size = 12, angle = 0, face = "plain"),
         axis.title.x = element_text(color = "black", size = 20, angle = 0, hjust = .5, vjust = 0, face = "plain"),
@@ -160,7 +160,6 @@ ggplot(df_final,
         legend.text = element_text(size=10),
         legend.position="none",
         legend.justification="right")
-ggsave("figures//Fig4C-2.pdf", width = 12,height = 6)
 ggsave("/data/lib14/project/scLongread/Fig4C.pdf", width = 12,height = 6)
 
 # Figure 4B
@@ -248,20 +247,25 @@ rst.list <- list()
 # Pairwise comparison of significant non-zero beta
 for (i in 1:length(ct)) {
   celltype <- ct[i]
-  zero_mtx <- beta_final!=0
-  # decide the credible sets of cell types with the specific cell type
-  zero_if_not <- zero_mtx + zero_mtx[,celltype]
-  zero_if_not <- zero_if_not ==2
+  # zero_mtx <- beta_final!=0
+  # # decide the credible sets of cell types with the specific cell type
+  # zero_if_not <- zero_mtx + zero_mtx[,celltype]
+  # zero_if_not <- zero_if_not ==2
   cs_mtx <- sig_mtx+sig_mtx[,celltype]
-  cs_if_true <- cs_mtx==2
+  cs_if_true <- cs_mtx>0
   
-  cs_divisor <- cs_if_true+zero_if_not
-  cs_divisor <- cs_divisor==2
-  mtx <- beta_final/beta_final[,celltype]
+  # cs_divisor <- cs_if_true+zero_if_not
+  # cs_divisor <- cs_if_true==2
+  cs_divisor <- colSums(cs_if_true)
+  mtx <-beta_final/beta_final[,celltype]
   mtx_if_shared <- (mtx > 0.5 & mtx < 2)
-  final_mtx <- mtx_if_shared+cs_divisor
-  sig_non0_shared <- (final_mtx==2)
-  rst <- colSums(sig_non0_shared, na.rm = TRUE)/colSums(cs_divisor)
+  # final_mtx <- mtx_if_shared+cs_divisor
+  # sig_non0_shared <- (final_mtx==2)
+  # # rst <- colSums(sig_non0_shared, na.rm = TRUE)/colSums(cs_divisor)
+  # rst <- colSums(sig_non0_shared, na.rm = TRUE)/nrow(msqe)
+  shared <- colSums(mtx_if_shared, na.rm = TRUE)
+  cs_divisor[celltype] <- shared[celltype]
+  rst <- colSums(mtx_if_shared, na.rm = TRUE)/cs_divisor
   rst.list[[celltype]] <- rst
 }
 ct_similarity <- Reduce(rbind, rst.list)
@@ -272,9 +276,12 @@ colnames(ct_similarity) <- CT_match[ct,"V2"]
 # colnames(S) = row.names(S) = colnames(m$result$PosteriorMean)
 # 
 
+x <- x[names(isoQTL_sig_list),names(isoQTL_sig_list)]
+rownames(x) <- CT_match[rownames(x),"V2"]
+colnames(x) <- CT_match[colnames(x),"V2"]
 library(pheatmap)
-p <- pheatmap(ct_similarity,border_color = "white")
-ggsave("/data/lib14/project/scLongread/Fig4D.pdf", p, width = 8,height = 7)
+p <- pheatmap(x,border_color = "white", cluster_cols = FALSE, cluster_rows = FALSE)
+ggsave("/data/lib14/project/scLongread/Fig4D_new.pdf", p, width = 8,height = 7)
 
 
 
@@ -1100,87 +1107,35 @@ ggplot(df_sum,aes(x=Indv_num,y=eIsoform))+geom_point() +
 ggsave("/data/lib14/project/scLongread/FigS7D.pdf", width = 7,height = 7)
 
 
-# Supplementary for Fig 4C
-# Figure 4C
-top_beta_eQTL <- c()
-beta_range_eQTL <- c()
-test <- apply(beta_top_tensor_qtl, 1, function(x){
-  min <- min(x)
-  max <- max(x)
-  beta_range_eQTL <- abs(abs(max) - abs(min))
-  if(min*max > 0){
-    if(max > 0){
-      x = x/max
-      top_beta_eQTL <- c(top_beta_eQTL,max)
-    }else{
-      x = x/min
-      top_beta_eQTL <- c(top_beta_eQTL,min)
-    }
-  }else{
-    if((max+min) > 0){
-      x = x/max
-      top_beta_eQTL <- c(top_beta_eQTL,max)
-    }else{
-      x = x/min
-      top_beta_eQTL <- c(top_beta_eQTL,min)
-    }
-  }
-  return(list((x > 0.5 & x <= 1),top_beta_eQTL, beta_range_eQTL))
+eIsoform <- str_split_fixed(rownames(true_sig), "\\|", 2)[,1]
+mashr_sig.list <- lapply(ct, function(x){
+  idx <- true_sig[,x]
+  mashr_sig <- unique(eIsoform[idx])
 })
-rst_magnitude <- NULL
-for (i in 1:length(test)) {
-  rst_magnitude <- rbind(rst_magnitude, test[[i]][[1]])
-}
-
-rownames(rst_magnitude) <- names(test)
-magnitude_sum <- rowSums(rst_magnitude)
-sum(magnitude_sum == 1) # 847
-sum(magnitude_sum == 33) # 29
-max(magnitude_sum)
-
-# Sign supplementary for Fig 4C
-top_beta_eQTL <- NULL
-for (i in 1:length(test)) {
-  top_beta_eQTL <- c(top_beta_eQTL, test[[i]][[2]])
-}
-lpairs_sign_eQTL <- apply(beta_top_tensor_qtl, 2, function(x) (x*top_beta_eQTL)>0)
-
-sign_sum <- rowSums(lpairs_sign_eQTL)
-sum(sign_sum == 1)
-sum(sign_sum == 33) # 1565
-
-
-
-
-
-
-
-df_mashr_isoQTL <- data.frame(specificity = c("Single", "Single","All", "All"), 
-                              number = c(1065, 187, 43, 383),
-                              aspect = c("magnitude", "sign", "magnitude", "sign"))
-
-df_mashr_eQTL <- data.frame(specificity = c("Single", "Single","All", "All"), 
-                              number = c(847, 0, 29, 1565),
-                              aspect = c("magnitude", "sign", "magnitude", "sign"))
-
-df_mashr_isoQTL$percentage <- df_mashr_isoQTL$number/2842
-df_mashr_isoQTL$QTL <- "isoQTL"
-df_mashr_eQTL$percentage <- df_mashr_eQTL$number/4372
-df_mashr_eQTL$QTL <- "eQTL"
-df_mashr_sum_comp <- rbind(df_mashr_isoQTL, df_mashr_eQTL)
-df_mashr_sum_comp$percentage <- round(df_mashr_sum_comp$percentage*100,1)
-df_mashr_sum_comp$specificity <- factor(df_mashr_sum_comp$specificity, levels = c("Single","All"))
-df_mashr_sum_comp$QTL <- factor(df_mashr_sum_comp$QTL, levels = c("isoQTL","eQTL"))
-ggplot(df_mashr_sum_comp, aes(x=specificity, y=percentage, fill = aspect)) +
-  geom_bar(stat="identity", position=position_dodge()) + xlab("")+ylab("Percentage of isoQTLs/eQTLs") +
-  geom_text(aes(label = percentage), position = position_dodge(.9), vjust = -.5)+
-  theme(axis.text.x = element_text(color = "black", size = 12, face = "plain"),
+df$eIsoSig_afterMashr <- sapply(mashr_sig.list, function(x) length(x))
+ggplot(df, aes(x=Celltype, y=Sig_afterMashr, fill = Celltype)) +
+  geom_bar(stat="identity")+scale_fill_manual(values = cellcolors)+ylab("Number of isoQTL after Mashr")+
+  theme(axis.text.x = element_text(color = "black", size = 12, angle = 90, hjust = 1, vjust = 0.5, face = "plain"),
         axis.text.y = element_text(color = "black", size = 12, angle = 0, face = "plain"),
+        axis.title.x = element_text(color = "black", size =16, angle = 0, hjust = .5, vjust = 0, face = "plain"),
         axis.title.y = element_text(color = "black", size = 16, angle = 90, hjust = .5, vjust = .5, face = "plain"),
         panel.background = element_rect(fill='transparent'),
         plot.background = element_rect(fill='transparent'),
         axis.line = element_line(linewidth = .5, colour = "black", linetype=1),
         legend.title = element_text(size=10),
         legend.text = element_text(size=10),
-        legend.justification="right")+facet_wrap(~QTL)
-ggsave("Mashr_QTL_comp.pdf", width = 8, height = 7)
+        legend.position="none",
+        legend.justification="right")
+ggplot(df, aes(x=Celltype, y=eIsoSig_afterMashr, fill = Celltype)) +
+  geom_bar(stat="identity")+scale_fill_manual(values = cellcolors)+ylab("Number of eIsoform after Mashr")+
+  theme(axis.text.x = element_text(color = "black", size = 12, angle = 90, hjust = 1, vjust = 0.5, face = "plain"),
+        axis.text.y = element_text(color = "black", size = 12, angle = 0, face = "plain"),
+        axis.title.x = element_text(color = "black", size =16, angle = 0, hjust = .5, vjust = 0, face = "plain"),
+        axis.title.y = element_text(color = "black", size = 16, angle = 90, hjust = .5, vjust = .5, face = "plain"),
+        panel.background = element_rect(fill='transparent'),
+        plot.background = element_rect(fill='transparent'),
+        axis.line = element_line(linewidth = .5, colour = "black", linetype=1),
+        legend.title = element_text(size=10),
+        legend.text = element_text(size=10),
+        legend.position="none",
+        legend.justification="right")

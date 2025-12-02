@@ -23,3 +23,17 @@ talon --f config1.csv \
       --cov 0.95 \
       --identity 0.95 \
       --o output2
+
+module load samtools
+module load TransDecoder
+
+pwd
+
+blastp -query transcripts.fasta.transdecoder_dir/longest_orfs.pep \
+	-db ../uniref100/uniprot_sprot -max_target_seqs 1 -outfmt 6 -evalue 1e-5 \
+	-num_threads 36 > blastp.outfmt6
+
+set -e
+module load hmmer
+hmmsearch --cpu $SLURM_CPUS_PER_TASK -E 1e-10 --domtblout pfam.domtblout /data/Choi_lung/scLongreads/TALON_workspace/pfam/Pfam-A.hmm \
+	/data/Choi_lung/scLongreads/TALON_workspace/test10s/transcripts.fasta.transdecoder_dir/longest_orfs.pep

@@ -3,12 +3,13 @@ library(ggplot2)
 library(stringr)
 library(stringi)
 
+# read GWAS stats downloaded from GWAS_catalog
+# https://www.ebi.ac.uk/gwas/publications/36914875
 lung_fun_gwas <- read.table(gzfile("/data/Choi_lung/scLongreads/colocalization/lung_function/GCST90244094_buildGRCh37.tsv.gz"), header = TRUE,
                             sep = "\t")
 lung_fun_assoc <- read.table("/data/Choi_lung/scLongreads/colocalization/lung_function/Lung_func_gwas_association.txt",
                              sep = "\t", header = TRUE)
-lung_fun_assoc_fev1 <- read.table("/data/Choi_lung/scLongreads/colocalization/lung_function/Lung_func_fev1_gwas_association.txt",
-                             sep = "\t", header = TRUE)
+
 lung_fun_gwas$snp <- paste(lung_fun_gwas$variant_id, lung_fun_gwas$other_allele, lung_fun_gwas$effect_allele, sep = "-")
 
 beds <- lung_fun_gwas[,c(2,3)]
@@ -19,10 +20,14 @@ options(scipen = 999)
 write.table(beds, file = "/data/Choi_lung/scLongreads/colocalization/lung_function/lung_fun_hg19.bed", 
             sep = "\t", row.names = FALSE, col.names = FALSE, quote = FALSE)
 length(unique(beds$snp))
+
+# read SNP info after liftover
 hg38_snps <- read.table("/data/Choi_lung/scLongreads/colocalization/lung_function/lung_fun_hg38.bed",
                         header = FALSE,sep = "\t")
 length(unique(hg38_snps$V4))
 colnames(hg38_snps) <- c("chr", "pos", "end", "snp")
+
+# clean format to match isoQTL
 hg38_snps$effect_allele <- str_split_fixed(hg38_snps$snp, "-", 3)[,3]
 hg38_snps$rsid <- str_split_fixed(hg38_snps$snp, "-", 3)[,1]
 hg38_snps$STRONGEST.SNP.RISK.ALLELE <- paste(hg38_snps$rsid, 
@@ -82,6 +87,7 @@ library(parallel)
 
 iso_tbt_list <- lapply(lSNP_win1MB.list, function(x) unique(x$phenotype_id))
 
+# extract isoQTL stats of SNPs w/ GWAS stats
 NB.coloc.list <- list()
 for (snp in lead_snps) {
   locus <- gwas_loci_total[[snp]]
@@ -165,7 +171,7 @@ for(i in 1:length(NB.coloc.list)){
         gene_list=as.character(unique(filt_eqtl$phenotype_id))
         eqtl_genes=list()
         eqtl_genes=foreach(i=gene_list) %dopar%
-          droplevels(filt_eqtl[filt_eqtl$phenotype_id==i,]) # Dropping unused levels makes a HUGE difference in time and final list size
+          droplevels(filt_eqtl[filt_eqtl$phenotype_id==i,]) 
         names(eqtl_genes)=gene_list
         
         ##note in the drop levels, it needs to be col 6 since that is where the rsIDs are for the eqtl data, otherwise you get an empty snp gene list.
@@ -242,44 +248,4 @@ output.final.sig <- output.final[which(output.final$PP.H4.abf > 0.7),]
 saveRDS(rst.list, file = "/data/Choi_lung/scLongreads/colocalization/lung_function/Colocalization_rst_list_lung_function.rds")
 saveRDS(output.list, file = "/data/Choi_lung/scLongreads/colocalization/lung_function/Colocalization_output_list_lung_function.rds")
 saveRDS(output.final.sig, file = "/data/Choi_lung/scLongreads/colocalization/lung_function/Colocalization_output_table.rds")
-output.final.sig <- readRDS("/data/Choi_lung/scLongreads/colocalization/lung_function/Colocalization_output_table.rds")
-NB.sig.list <- readRDS("/data/Choi_lung/scLongreads/jaxqtl/isoQTL_NB_sig_list.rds")
-NB.sig.list <- lapply(names(NB.sig.list), function(x){
-  rst <- NB.sig.list[[x]]
-  rst$Celltype <- x
-  return(rst)
-})
-isoQTL_sig <- do.call(rbind,NB.sig.list)
-
-isoQTL_sig$sig_iso_ct <- paste(isoQTL_sig$phenotype_id, isoQTL_sig$Celltype, sep = "-")
-output.final.sig$sig_iso_ct <- paste(output.final.sig$transcript_id, output.final.sig$Celltype, sep = "-")
-output.final.sig <- subset(output.final.sig, sig_iso_ct %in% isoQTL_sig$sig_iso_ct)
-length(unique(output.final.sig$leadSNP))
-length(unique(output.final.sig$transcript_id))
-
-write.table(output.final.sig,"/data/Choi_lung/scLongreads/colocalization/lung_function/Lung_fun_sig_coloc_table.txt", row.names = FALSE, quote = FALSE)
-saveRDS(output.final.sig, file = "/data/Choi_lung/scLongreads/colocalization/lung_function/Colocalization_output_table.rds")
-
-
-lung_cancer <- read.table("/data/Choi_lung/scLongreads/colocalization/Byun_coloc/GCST90134661_buildGRCh37.tsv", header = TRUE,
-                            sep = "\t")
-lung_cancer$ID <- paste(lung_cancer$variant_id, lung_cancer$other_allele, lung_cancer$effect_allele, sep = "-")
-gwas_total$ID <- paste(gwas_total$variant_id, gwas_total$other_allele, gwas_total$effect_allele, sep = "-")
-rownames(lung_cancer) <- lung_cancer$ID
-rownames(gwas_total) <- gwas_total$ID
-lung_cancer <- lung_cancer[gwas_total$ID,]
-which(lung_cancer$p_value != gwas_total$p_value)
-which(lung_cancer$odds_ratio != gwas_total$odds_ratio)
-
-
-
-lead_SNP <- read.table("/data/Choi_lung/scLongreads/colocalization/Byun_luad.txt", header = TRUE,sep = ",")
-
-tmp <- read.table("/data/Choi_lung/scLongreads/colocalization/Byun_sqc.txt", header = TRUE,sep = ",")
-lead_SNP <- rbind(lead_SNP, tmp)
-tmp <- read.table("/data/Choi_lung/scLongreads/colocalization/Byun_scc.txt", header = TRUE,sep = ",")
-lead_SNP <- rbind(lead_SNP, tmp)
-tmp <- read.table("/data/Choi_lung/scLongreads/colocalization/Byun_total_lung.txt", header = TRUE,sep = ",")
-lead_SNP <- rbind(lead_SNP, tmp)
-
 
