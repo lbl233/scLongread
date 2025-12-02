@@ -1,4 +1,5 @@
-# Figure 3 & 4
+# Figure 3, 4, 5 
+# Relevant supplementary figures
 
 # Bolun Li 
 
@@ -11,6 +12,7 @@ lr <- readRDS("/data/Choi_lung/scLongreads/Seurat/final/lr_final_v2_wRNAexpr.RDS
 lr.isoform.sub <- readRDS("/data/Choi_lung/scLongreads/Seurat/final/lr_final_w_isoform_expr.RDS")
 load("/vf/users/Choi_lung/scLongreads/DEI/DEI_ct_specific_eIsofrom_GTEx_compare.RData")
 
+# Figure 3C
 DEI_sig <- do.call(rbind,DEI_sig.list )
 DEI_sig$gene_name <-  TALON_afterqc_orf_secondpass2[DEI_sig$X,"annot_gene_name"]
 Annotation_gene_list <- unique(c(Epi_sig_list, Imm_sig_list, Endo_sig_list, Stroma_sig_list))
@@ -219,74 +221,7 @@ ggplot(df_long, aes(fill=variable, y=value, x=Celltype_matching)) + ylab("Number
         legend.justification="right")
 ggsave("/data/lib14/project/scLongread/Fig4E.pdf", width = 8,height = 7)
 
-
-# Figure 4D
-msqe <- multistateQTL::callSignificance(tmp, assay="lfsrs", thresh=0.05)
-msqe <- multistateQTL::getSignificant(msqe, assay="significant")
-beta_mtx <- msqe@assays@data$betas
-sig_mtx <- msqe@assays@data$significant
-
-msqe <- readRDS("/data/Choi_lung/scLongreads/mashr/output/mashr_1M_leadpairs.rds")
-msqe <- multistateQTL::callSignificance(msqe, assay="lfsrs", thresh=0.05)
-setwd("/data/Choi_lung/scLongreads/mashr/")
-rownames <- h5read("lead_isoQTL.h5", "rownames")
-colnames <- h5read("lead_isoQTL.h5", "colnames")
-betas <- h5read("lead_isoQTLs_ez.h5", "betas")
-row.names(betas) <- rownames
-colnames(betas) <- colnames
-error <- h5read("lead_isoQTL.h5", "error")
-row.names(error) <- rownames
-colnames(error) <- colnames
-error <- error[rownames(msqe),]
-betas <- betas[rownames(msqe),]
-
-error[betas==0] <- 0
-beta_final <- beta_mtx*error
-ct <- colnames(beta_final)
-rst.list <- list()
-# Pairwise comparison of significant non-zero beta
-for (i in 1:length(ct)) {
-  celltype <- ct[i]
-  # zero_mtx <- beta_final!=0
-  # # decide the credible sets of cell types with the specific cell type
-  # zero_if_not <- zero_mtx + zero_mtx[,celltype]
-  # zero_if_not <- zero_if_not ==2
-  cs_mtx <- sig_mtx+sig_mtx[,celltype]
-  cs_if_true <- cs_mtx>0
-  
-  # cs_divisor <- cs_if_true+zero_if_not
-  # cs_divisor <- cs_if_true==2
-  cs_divisor <- colSums(cs_if_true)
-  mtx <-beta_final/beta_final[,celltype]
-  mtx_if_shared <- (mtx > 0.5 & mtx < 2)
-  # final_mtx <- mtx_if_shared+cs_divisor
-  # sig_non0_shared <- (final_mtx==2)
-  # # rst <- colSums(sig_non0_shared, na.rm = TRUE)/colSums(cs_divisor)
-  # rst <- colSums(sig_non0_shared, na.rm = TRUE)/nrow(msqe)
-  shared <- colSums(mtx_if_shared, na.rm = TRUE)
-  cs_divisor[celltype] <- shared[celltype]
-  rst <- colSums(mtx_if_shared, na.rm = TRUE)/cs_divisor
-  rst.list[[celltype]] <- rst
-}
-ct_similarity <- Reduce(rbind, rst.list)
-CT_match[ct,"V2"]
-rownames(ct_similarity) <- CT_match[ct,"V2"]
-colnames(ct_similarity) <- CT_match[ct,"V2"]
-# ct_similarity[lower.tri(ct_similarity, diag = FALSE)] = t(ct_similarity)[lower.tri(ct_similarity, diag = FALSE)]
-# colnames(S) = row.names(S) = colnames(m$result$PosteriorMean)
-# 
-
-x <- x[names(isoQTL_sig_list),names(isoQTL_sig_list)]
-rownames(x) <- CT_match[rownames(x),"V2"]
-colnames(x) <- CT_match[colnames(x),"V2"]
-library(pheatmap)
-p <- pheatmap(x,border_color = "white", cluster_cols = FALSE, cluster_rows = FALSE)
-ggsave("/data/lib14/project/scLongread/Fig4D_new.pdf", p, width = 8,height = 7)
-
-
-
-
-# Figure 
+# Plot isoform structures 
 celltypes <- names(DEI_sig.list)
 DEI_sig.list <- lapply(celltypes, function(x){
   rst <- DEI_sig.list[[x]]
@@ -371,63 +306,6 @@ p1 <- plot_top_isoforms_by_ct(gene_id, 4)
 p1
 ggsave("/data/lib14/project/scLongread/FigS13A.pdf", width = 8, height = 16)
 
-
-idx <- grepl(gene_id, TALON_afterqc_orf_secondpass$annot_gene_id)
-idx <- which(TALON_afterqc_orf_secondpass$annot_gene_id %in% gene_list)
-isoform_list <- TALON_afterqc_orf_secondpass$transcript_name_unique[idx]
-isoform_id_list <- TALON_afterqc_orf_secondpass$annot_transcript_id[idx]
-count <- count_mtx_per_final[isoform_list,]
-expr <- norm_mtx_sum[isoform_list,]
-
-######## Additional analysis for the most abundant isoforms ##############
-df_ab <- data.frame(isoform = rownames(expr),
-                    isoform_id = isoform_id_list,
-                    sum = rowSums(expr))
-df_ab <- df_ab %>% group_by(isoform_id) %>% mutate(gene_id = Search_transcript_gene_id(isoform_id))
-df_ab <- df_ab %>% group_by(gene_id) %>% mutate(rank = rank(-sum))
-df_ab_top1 <- subset(df_ab, rank <= 2)
-length(which(unique(tmp$phenotype_id.x) %in% df_ab_top1$isoform_id))
-#####################################
-
-
-# names(head(sort(rowSums(count),decreasing = TRUE), 10))
-# ct_list <- c("AT2", "Alveolar transitional cells", "Secretory transitional cells", "Basal",
-#              "Multiciliated", "Adventitial fibroblasts", "Myofibroblast")
-# ct_list <- gsub(" ", "_", ct_list)
-celltypes
-library(reshape2)
-# expr <- expr[,which(as.character(group) %in% ct_list)]
-group <- as.character(str_split_fixed(colnames(expr), "-", 2)[,1])
-
-df_long <- melt(as.data.frame(expr))
-df_long$Celltype <- str_split_fixed(df_long$variable, "-", 2)[,1]
-df_long$Isoform <- rep(rownames(expr), ncol(expr))
-ct = "Multiciliated"
-ct = "Alveolar_macrophages"
-for (ct in ct_list) {
-  df_long_sub <- subset(df_long, Celltype == ct)
-  expr_sub <- expr[,which(as.character(group) == ct)]
-  ranks <- names(sort(rowSums(expr_sub),decreasing = TRUE))
-  write.table(expr_sub, paste0("/data/Choi_lung/scLongreads/Seurat/Collaboration_XZh/FAM13A_expr_by_indv_",ct, ".txt"), sep = "\t",
-              quote = FALSE)
-  df_long_sub$Isoform <- factor(df_long_sub$Isoform, levels = ranks)
-  p <- ggplot(df_long_sub, aes(fill = Celltype, y = value, x = Isoform)) +
-    geom_bar(
-      position = "dodge", width = 0.8, stat = "summary", fun = "mean",
-      color = "black", linewidth = .5
-    ) +
-    stat_summary(
-      fun.data = mean_sdl, geom = "errorbar", color = "black",
-      position = position_dodge(0.8), width = 0.2, linewidth = 0.5
-    ) +
-    geom_point(
-      position = position_jitterdodge(0.5, dodge.width = .8),
-      alpha = 0.5
-    )+theme_bw()+RotatedAxis()
-  pdf(paste0("/data/Choi_lung/scLongreads/Seurat/Collaboration_XZh/FAM13A_expr_by_indv_",ct, ".pdf"), width = 15)
-  print(p)
-  dev.off()
-}
 Isoforms = c("SPSB2-TALONT000636472")
 Isoforms = c("SCGB1A1-202")
 Isoforms = c("CAV1-TALONT003058356", "CAV1-201")
@@ -753,30 +631,8 @@ ggplot() +
         legend.text = element_text(size=10), legend.position = "none")
 ggsave("/data/lib14/project/scLongread/FigS4C_V3.pdf", width = 10,height = 7)
 ggsave("/data/lib14/project/scLongread/FigS4C_legend.pdf", width = 10,height = 7)
-ggplot(data = df_expr,aes(x=Model, y=exprs, fill=Model)) + 
-  #geom_half_violin(aes(fill = Sig),color=NA, alpha=0.5,width=1) +  
-  geom_half_violin(
-    aes(x = Model, y = exprs, split = Sig, fill = Sig),
-    position = "identity"
-  )+
-  geom_half_boxplot(side = "l", errorbar.draw = FALSE, width=0.7, linewidth=0.5) +
-  # geom_half_dotplot(dotsize = .15, method="histodot", stackdir="up")+
-  #geom_beeswarm(beeswarmArgs = list(side = 2))+
-  # geom_half_point(mapping = aes(colour = Sig, fill=Sig),side = "r", shape=21, size=1) +  
-  labs(y="",x=NULL) +   
-  theme(axis.text.x = element_text(color = "black", size = 12, angle = 90, vjust = 0.5, hjust=1),
-        axis.text.y = element_text(color = "black", size = 12, angle = 90, vjust = 0.5, hjust=1),  
-        axis.title.x = element_text(color = "black", size = 16),
-        axis.title.y = element_text(color = "black", size = 16),
-        panel.background = element_rect(fill='transparent'),
-        plot.background = element_rect(fill='transparent'),
-        axis.line = element_line(linewidth = .5, colour = "black", linetype=1),
-        legend.title = element_text(size=10), 
-        legend.text = element_text(size=10),
-        legend.position = "none")
 
-
-
+# Figure S4C
 ggplot(df_expr) +
   geom_histogram(aes(x=exprs,y=..density..,fill=Model),position="identity",alpha=.5,binwidth = 0.02) + 
   geom_density(aes(x=exprs,y=..density.., color=Model), linewidth = 1)+
@@ -790,32 +646,6 @@ ggplot(df_expr) +
         strip.text = element_text(size = 16, colour = "black"))
 
 ggsave("/data/lib14/project/scLongread/FigS4C_v2.pdf", width = 10,height = 7)
-
-AT2_cis_Tensor$pair <-  paste(AT2_cis_Tensor$phenotype_id, AT2_cis_Tensor$variant_id, sep = ":")
-AT2_cis_NB$pair <-  paste(AT2_cis_NB$phenotype_id, AT2_cis_NB$variant_id, sep = ":")
-leadpairs <- (intersect(AT2_cis_NB$pair, AT2_cis_Tensor$pair))
-AT2_cis_NB <- subset(AT2_cis_NB, pair %in% leadpairs)
-AT2_cis_Tensor <- subset(AT2_cis_Tensor, pair %in% leadpairs)
-rownames(AT2_cis_NB) <- AT2_cis_NB$pair
-rownames(AT2_cis_Tensor) <- AT2_cis_Tensor$pair
-AT2_cis_NB <- AT2_cis_NB[leadpairs,]
-AT2_cis_Tensor <- AT2_cis_Tensor[leadpairs,]
-plot(-log10(AT2_cis_Tensor$qval), -log10(AT2_cis_NB$qval))
-abline(0,1)
-abline(-log10(0.05),0)
-
-# examples with opposite direction of 
-Nominal_combined$pair <- paste(Nominal_combined$snp, Nominal_combined$phenotype_id, sep = ":")
-test <- Nominal_combined %>% group_by(pair) %>% mutate(if_pos = sum(slope > 0),
-                                                       if_neg = sum(slope < 0),
-                                                       count = sum(significance))
-idx1 <- which(test$if_pos != test$count)
-idx2 <- which(test$if_neg != test$count)
-idx_final <- intersect(idx1, idx2)
-test <- test[idx_final,]
-test <- test %>% group_by(phenotype_id) %>% mutate(transcript_name = Search_transcript_name2(phenotype_id))
-length(unique(test$transcript_name))
-
 
 # Figure 3B
 table(lr.isoform.sub$Celltype)
@@ -850,7 +680,7 @@ ggplot(data = df_stat,aes(x=Celltype, y=`Cell proportion`, fill=Celltype)) +
         legend.position = "none")
 ggsave("/data/lib14/project/scLongread/Fig3B.pdf", width = 12,height = 7)
 
-
+# Figure S5C
 df_stat_sub <- subset(df_stat, `Cell number` >= 5)
 table(df_stat_sub$Celltype)
 df <- as.data.frame(table(df_stat_sub$Celltype))
@@ -919,6 +749,7 @@ ggsave("/data/lib14/project/scLongread/Fig5H2.pdf", width = 10,height = 7)
 ranges.show <- StringToGRanges(c("chr14-34872798-34875547", "chr14-34743531-34744103"))
 ranges.show$color <- c("orange", "darkred")
 
+# Generate scATAC-seq coverage plot
 Idents(share_seur) <- "CellType"
 CoveragePlot(
   object = share_seur,
@@ -928,21 +759,7 @@ CoveragePlot(
   extend.downstream = 200,
   links = TRUE
 )
-# try another cell type specific example
-tmp <- final_table[,c("phenotype_id", "variant_id", "Isoform_specific")]
-tmp <- tmp[!duplicated(tmp),]
-tmp$pair <- paste(tmp$phenotype_id, tmp$variant_id, sep = "|")
-rownames(tmp) <- tmp$pair
-tmp <- tmp[rownames(rst_magnitude),]
-grep("ENST00000534397",which(tmp$Isoform_specific & (rowSums(rst_magnitude) == 1)))
 
-tmp <- tmp %>% group_by(phenotype_id) %>% mutate(transcript_name = Search_transcript_name2(phenotype_id))
-View(tmp[which(tmp$Isoform_specific & (rowSums(rst_magnitude) == 1)),])
-DEI_sig_sub <- subset(DEI_sig, X %in% tmp[which(tmp$Isoform_specific & (rowSums(rst_magnitude) == 1)),]$transcript_name)
-DEI_sig_sub$unique_id <- paste(DEI_sig_sub$X, DEI_sig_sub$Celltype, sep = "-")
-final_unique_id <- unique(paste(final_table$transcript_name, final_table$Celltype, sep = "-"))
-
-View(DEI_sig_sub[which(DEI_sig_sub$unique_id %in% final_unique_id), ])
 
 # Figure S7
 NB.sig.list <- readRDS("/data/Choi_lung/scLongreads/jaxqtl/isoQTL_NB_sig_list.rds")
@@ -1036,46 +853,6 @@ ggplot(df_sum,aes(x=Cell_num,y=eIsoform))+geom_point() +
         legend.justification="right")
 ggsave("/data/lib14/project/scLongread/FigS7C.pdf", width = 7,height = 7)
 
-ggplot(df_sum,aes(x=Cell_num_per_indv,y=eIsoform))+geom_point() +
-  stat_smooth(method=lm,formula=y~x) + 
-  geom_text_repel(aes(color = Celltype_matching),label=df_sum$Celltype_matching)+
-  scale_color_manual(values = cellcolors)+
-  stat_cor(label.y = 600,aes(label = paste(..rr.label.., ..p.label.., sep = "~`,`~")))+
-  ylab("Number of eIsoform")+
-  xlab("Number of cells per individual")+theme_classic()+
-  ggtitle("Association between the numbers of eIsoform and cells")+
-  theme(axis.text.x = element_text(color = "black", size = 12, angle = 0, face = "plain"),
-        axis.text.y = element_text(color = "black", size = 12, angle = 0, face = "plain"),
-        axis.title.x = element_text(color = "black", size = 20, angle = 0, hjust = .5, vjust = 0, face = "plain"),
-        axis.title.y = element_text(color = "black", size = 20, angle = 90, hjust = .5, vjust = .5, face = "plain"),
-        panel.background = element_rect(fill='transparent'),
-        plot.background = element_rect(fill='transparent'),
-        axis.line = element_line(linewidth = .5, colour = "black", linetype=1),
-        legend.title = element_text(size=10),
-        legend.text = element_text(size=10),
-        legend.position="none",
-        legend.justification="right")
-ggsave("/data/lib14/project/scLongread/FigS7D.pdf", width = 7,height = 7)
-
-
-df$celltype <- gsub(" ","_", df$celltype)
-df_sum <- left_join(df_sum, df, by = "celltype")
-colnames(df_sum)[9] <- "Num_indv"
-df_sum$Total_isoform <- as.numeric(df_sum$Total_isoform)
-df_sum$eIsoform <- as.numeric(df_sum$eIsoform)
-df_sum$Cell_num <- as.numeric(df_sum$Cell_num)
-df_sum$Num_indv <- as.numeric(df_sum$Num_indv)
-model_full <- lm(eIsoform ~ Total_isoform + Cell_num + Num_indv, data = df_sum)
-model1 <- lm(eIsoform ~ Num_indv+Total_isoform, data = df_sum)
-model2 <- lm(eIsoform ~ Cell_num + Num_indv, data = df_sum)
-model3 <- lm(eIsoform ~ Total_isoform + Cell_num, data = df_sum)
-anova(model1, model_full, test = "LRT")
-
-library(lmtest)
-# Using the models from the previous example
-lrtest(model1, model_full)
-lrtest(model2, model_full)
-lrtest(model3, model_full)
 
 files_path <- paste0("/data/Choi_lung/scLongreads/tensorqtl/isoform_level/", names(NB.sig.list),
                      "/samples.txt")
