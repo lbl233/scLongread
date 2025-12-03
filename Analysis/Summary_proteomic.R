@@ -57,15 +57,6 @@ sum(grepl("TALONT", eIsoforms))
 sum(grepl("TALONT", eIsoform_pro_val))
 table(pro_detection_only_one_unique_peptide$Novelty)
 cds_fastafile <- cds_fastafile[pro_detection$Accession]
-# Novel isoform
-sum(grepl("TALONT", pro_detection$Accession))/18697 # 9.7%
-sum(grepl("TALONT", pro_detection$Accession[pro_detection$MoreThanOne]))/18697 # 8.0%
-sum(grepl("TALONT", pro_detection$Accession[pro_detection$All]))/18697 # 5.6%
-
-# Known isoform
-sum(!grepl("TALONT", pro_detection$Accession))/(length(subsetlist) - 18697)  # 24.7%
-sum(!grepl("TALONT", pro_detection$Accession[pro_detection$MoreThanOne]))/(length(subsetlist) - 18697)  # 21.5%
-sum(!grepl("TALONT", pro_detection$Accession[pro_detection$All]))/(length(subsetlist) - 18697)  # 16.6%
 
 # Novel isoform
 sum(grepl("TALONT", pro_detection_hc$Accession))/18697 # 8.7%
@@ -104,106 +95,7 @@ ggplot(subset(df_overall, detection != "More than one"), aes(x = detection, y = 
 
 ggsave("/data/lib14/project/scLongread/Fig2G.pdf", width = 7,height = 7)
 
-lr.isoform.sub <- readRDS("/data/Choi_lung/scLongreads/Seurat/final/lr_final_w_isoform_expr.RDS")
-lr <- readRDS("/data/Choi_lung/scLongreads/Seurat/final/lr_final_v2_wRNAexpr.RDS")
-lr.isoform.sub$Sample_NCI <- lr$Sample_NCI
-count_mtx <- lr.isoform.sub@assays$Isoform@counts
-count_mtx <- count_mtx[TALON_afterqc_orf_secondpass2$transcript_name_unique,]
-group <- as.character(lr.isoform.sub$Sample_NCI) %>% fct_inorder()
-group_mat <- sparse.model.matrix(~ 0 + group) %>% t
-# Adjust row names to get the correct final row names
-rownames(group_mat) <- rownames(group_mat) %>% str_extract("(?<=^group).+")
-count_mtx_T <- Matrix::t(count_mtx)
-count_mtx_sum <- group_mat %*% count_mtx_T  
-dim(count_mtx_sum)
-sum(count_mtx_sum)
-count_mtx_sum <- Matrix::t(count_mtx_sum)
-dim(count_mtx_sum)
-indv_expr_tf <- (count_mtx_sum > 0)
-
-colnames(indv_expr_tf)
-head(rownames(indv_expr_tf))
-iso_detection <- as.data.frame(indv_expr_tf[pro_detection$transcript_name,c("NCI_134", "NCI_135", "NCI_138", "NCI_139")])
-iso_detection_all <- as.data.frame(indv_expr_tf[pro_detection$transcript_name,])
-
-pro_detection$NCI134_trans <- TRUE
-pro_detection$NCI135_trans <- TRUE
-pro_detection$NCI138_trans <- TRUE
-pro_detection$NCI139_trans <- TRUE
-pro_detection$NCI134_trans[which(!iso_detection_all$NCI_134)] <- FALSE
-pro_detection$NCI135_trans[which(!iso_detection_all$NCI_135)] <- FALSE
-pro_detection$NCI138_trans[which(!iso_detection_all$NCI_138)] <- FALSE
-pro_detection$NCI139_trans[which(!iso_detection_all$NCI_139)] <- FALSE
-NCI134_tranNO_proYes <- unique(pro_detection$transcript_id[which(pro_detection$NCI134 & !(pro_detection$NCI134_trans))])
-NCI135_tranNO_proYes <- unique(pro_detection$transcript_id[which(pro_detection$NCI135 & !(pro_detection$NCI135_trans))])
-NCI138_tranNO_proYes <- unique(pro_detection$transcript_id[which(pro_detection$NCI138 & !(pro_detection$NCI138_trans))])
-NCI139_tranNO_proYes <- unique(pro_detection$transcript_id[which(pro_detection$NCI139 & !(pro_detection$NCI139_trans))])
-
-sum(grepl("TALONT",NCI134_tranNO_proYes))
-sum(grepl("TALONT",NCI135_tranNO_proYes))
-sum(grepl("TALONT",NCI138_tranNO_proYes))
-sum(grepl("TALONT",NCI139_tranNO_proYes))
-
-
-count_mtx <- lr.isoform.sub@assays$Isoform@counts
-count_mtx <- count_mtx[TALON_afterqc_orf_secondpass2$transcript_name_unique,]
-lr.isoform.sub$orig.ident <- as.character(lr.isoform.sub$orig.ident)
-group <- lr.isoform.sub$orig.ident %>% fct_inorder()
-group_mat <- sparse.model.matrix(~ 0 + group) %>% t
-# Adjust row names to get the correct final row names
-rownames(group_mat) <- rownames(group_mat) %>% str_extract("(?<=^group).+")
-count_mtx_T <- Matrix::t(count_mtx)
-count_mtx_sum <- group_mat %*% count_mtx_T  
-dim(count_mtx_sum)
-sum(count_mtx_sum)
-count_mtx_sum <- Matrix::t(count_mtx_sum)
-dim(count_mtx_sum)
-iso_detection_batch <- as.data.frame((count_mtx_sum > 0)[pro_detection$transcript_name,])
-pro_detection <- cbind(pro_detection, iso_detection_batch[,c("20_NCI_130_135","21_NCI_136_140")])
-
-Batch20_tranNO_proYes <- unique(pro_detection$transcript_id[which(pro_detection$NCI134 & !(pro_detection$`20_NCI_130_135`))])
-Batch20_1_tranNO_proYes <- unique(pro_detection$transcript_id[which(pro_detection$NCI135 & !(pro_detection$`20_NCI_130_135`))])
-Batch21_tranNO_proYes <- unique(pro_detection$transcript_id[which(pro_detection$NCI138 & !(pro_detection$`21_NCI_136_140`))])
-Batch21_1_tranNO_proYes <- unique(pro_detection$transcript_id[which(pro_detection$NCI139 & !(pro_detection$`21_NCI_136_140`))])
-
-tranNO_proYes_df <- data.frame(Number = c(length(NCI134_tranNO_proYes), length(NCI135_tranNO_proYes), length(NCI138_tranNO_proYes), length(NCI139_tranNO_proYes),
-                                          length(Batch20_tranNO_proYes), length(Batch20_1_tranNO_proYes), length(Batch21_tranNO_proYes), length(Batch21_1_tranNO_proYes)),
-                               Sample = rep(c("NCI134", "NCI135", "NCI138", "NCI139"), 2), 
-                               Batch = rep(c("Batch20", "Batch20", "Batch21", "Batch21"), 2),
-                               Level = rep(c("Sample", "Batch"), each = 4))
-ggplot(tranNO_proYes_df, aes(x = Sample, y = Number, fill = Level)) +
-  geom_col(position = "dodge") +
-  geom_text(
-    aes(label = Number),
-    colour = "black", size = 4.5,
-    vjust = 1.5, position = position_dodge(.9)
-  )+ylab("Number of isoforms")+ ggtitle("Isoforms detected at protein level but not transcript level")+xlab("") + 
-  theme(axis.text.y = element_text(color = "black", size = 12, angle = 0, face = "plain"),
-        axis.title.x = element_text(color = "black", size = 20, angle = 0, hjust = .5, vjust = 0, face = "plain"),
-        axis.title.y = element_text(color = "black", size = 16, angle = 90, hjust = .5, vjust = .5, face = "plain"),
-        panel.background = element_rect(fill='transparent'),
-        plot.background = element_rect(fill='transparent'),
-        axis.line = element_line(linewidth = .5, colour = "black", linetype=1),
-        legend.title = element_text(size=12),
-        legend.text = element_text(size=12),
-        
-        axis.text.x = element_text(color = "black", size = 12),
-        strip.background = element_blank(), strip.text = element_text(size = 14))
-ggsave("/data/lib14/project/scLongread/Fig2G-2.pdf", width = 8,height = 7)
-sum(pro_detection_hc$NCI134)
-sum(pro_detection_hc$NCI135)
-sum(pro_detection_hc$NCI138)
-sum(pro_detection_hc$NCI139)
-"MLLFLLSALVLLTQPLGYLEAEMKTYSHRTMPSACTLVMCSSVESGLPGRDGRDGREGPRGEKGDPGLPGAAGQAGMPGQAGPVGPKGDNGSVGEPGPKGDTGPSGPPGPPGVPGPAGREGPLGKQGNIGPQGKPGPKGEAGPKGEVGAPGMQGSAGARGLAGPKGERGVPGERGVPGNTGAAGSAGAMGPQGSPGARGPPGLKGDKGIPGDKGAKGESGLPDVASLRQQVEALQGQVQHLQAAFSQYKKVELFPNGQSVGEKIFKTAGFVKPFTEAQLLCTQAGGQLASPRSAAENAALQQLVVAKNEAAFLSMTDSKTEGKFTYPTGESLVYSNWAPGEPNDDGGSEDCVEIFTNGKWNDRACGEKRLVVCEF"
-"MILNKALLLGALALTTVMSPCGGEDIVADHVASCGVNLYQFYGPSGQYTHEFDGDEQFYVDLERKETAWRWPEFSKFGGFDPQGALRNMAVAKHNLNIMIKRYNSTAATNEVPEVTVFSKFPVTLGQPNTLICLVDNIFPPVVNITWLSNGHSVTEGVSETSFLSKSDHSFFKISYLTFLPSADEIYDCKVEHWGLDEPLLKHWEPEIPAPMSELTETLVCALGLSVGLMGIVVGTVFIIQGLRSVGASRHQGLL"
-"MILNKALLLGALALTTVMSPCGGEDIVADHVASCGVNLYQFYGPSGQYTHEFDGDEQFYVDLERKETAWRWPEFSKFGGFDPQGALRNMAVAKHNLNIMIKRYNSTAATNEVPEVTVFSKSPVTLGQPNTLICLVDNIFPPVVNITWLSNGQSVTEGVSETSFLSKSDHSFFKISYLTFLPSADEIYDCKVEHWGLDQPLLKHWEPEIPAPMSELTETVVCALGLSVGLMGIVVGTVFIIQGLRSVGASRHQGPL"
-tmp <- unique(DEIs_sig$X.DEI[which(DEIs_sig$log2FoldChange.DEI > DEIs_sig$log2FoldChange.DEG)])[which(unique(DEIs_sig$X.DEI[which(DEIs_sig$log2FoldChange.DEI > DEIs_sig$log2FoldChange.DEG)]) %in% pro_detection$transcript_name)]
-df <- data.frame(transcrip_name = tmp,
-                 gene_name = TALON_afterqc_orf_secondpass2[tmp,"annot_gene_name"])
-View(df[which(df$gene_name %in% c(Epi_sig_list, Imm_sig_list, Endo_sig_list,Stroma_sig_list)),])
-"MSIRVTQKSYKVSTSGPRAFSSRSYTSGPGSRISSSSFSRVGSSNFRGGLGGGYGGASGMGGITAVTVNQSLLSPLVLEVDPNIQAVRTQEKEQIKTLNNKFASFIDKVRFLEQQNKMLETKWSLLQQQKTARSNMDNMFESYINNLRRQLETLGQEKLKLEAELGNMQGLVEDFKNKYEDEINKRTEMENEFVLIKKDVDEAYMNKVELESRLEGLTDEINFLRQLYEEEIRELQSQISDTSVVLSMDNSRSLDMDSIIAEVKAQYEDIANRSRAEAESMYQIKYEELQSLAGKHGDDLRRTKTEISEMNRNISRLQAEIEGLKGQRASLEAAIADAEQRGELAIKDANAKLSELEAALQRAKQDMARQLREYQELMNVKLALDIEIATYRKLLEGEESRLESGMQNMSIHTKTTSGYAGGLSSAYGGLTSPGLSYSLGSSFGSGAGSSSFSRTSSSRAVVVKKIETRDGKLVSESSDVLPK"
-
-
+# External mass-spec validation
 # Glinos et al 2022
 GTEx_pro_val <- read.table("/data/lib14/R/Rscripts/Glinos_TS3.txt", sep = "\t", header = TRUE)
 GTEx_pro_val_sub <- subset(GTEx_pro_val, Mass_Spec == "Yes")

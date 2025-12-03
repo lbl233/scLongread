@@ -1,4 +1,5 @@
 # convert seurat object into h5ad
+# run scArches
 
 library(dior)
 library(reticulate)
@@ -40,6 +41,9 @@ adata_Seurat$Celltype_clean <- df$V2
 write.table(table(adata_Seurat$Celltype_clean, adata_Seurat$predicted.ann_finest_level), file = "/data/Choi_lung/scLongreads/Seurat/Compare_scArches_Azimuth.txt", 
             sep = "\t", quote = FALSE)
 
+################
+# Compare the automatic annotation between long-read and short-read
+
 sr.seur.annot <- readRDS('/data/Choi_lung/TTL/Seurat/Final_Batch_Lift/Data_vireo/demuxlet_vireo/az.RDS')
 sr.seur.annot@assays$SCT <- NULL
 DefaultAssay(sr.seur.annot) <- "RNA"
@@ -73,6 +77,7 @@ DimPlot(adata_Seurat, reduction = "X_umap", group.by = "Celltype_clean", label =
 DimPlot(adata_Seurat, reduction = "X_umap", group.by = "predicted.ann_finest_level", label = TRUE)+coord_equal()
 save(list = ls(), file = "/data/Choi_lung/scLongreads/Seurat/lr.sc.data.scArches.annot.129.RData")
 
+# Heat map to show the percentage of agreement
 df_per <- data.frame((table(annot.meta$azimuth_sorted, annot.meta$predicted.ann_finest_level.y)))
 df_new <- apply(df_per, 2, function(x)x/sum(x))
 library(reshape2)

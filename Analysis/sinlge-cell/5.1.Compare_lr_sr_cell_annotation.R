@@ -1,3 +1,6 @@
+# Code for comparing final annotation between long-read and short-read data
+
+# Author: Bolun, Elelta
 library(Seurat)
 library(clustree)
 library(dplyr)
